@@ -166,6 +166,11 @@ func (c *Config) Update(m map[string]any) error {
 		return fmt.Errorf("config is not updatable")
 	}
 
+	// Fast path: check if map is empty
+	if len(m) == 0 {
+		return nil
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
