@@ -1,6 +1,6 @@
 //go:build !darwin && !linux && !freebsd && !openbsd && !windows
 
-package guid
+package metaid
 
 import "errors"
 

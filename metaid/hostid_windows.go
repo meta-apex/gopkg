@@ -1,6 +1,6 @@
 //go:build windows
 
-package guid
+package metaid
 
 import (
 	"fmt"

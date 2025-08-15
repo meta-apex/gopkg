@@ -1,6 +1,6 @@
 //go:build darwin
 
-package guid
+package metaid
 
 import (
 	"errors"

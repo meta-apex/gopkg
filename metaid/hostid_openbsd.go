@@ -1,6 +1,6 @@
 //go:build openbsd
 
-package guid
+package metaid
 
 import "syscall"
 

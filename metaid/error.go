@@ -1,4 +1,4 @@
-package guid
+package metaid
 
 const (
 	// ErrInvalidID is returned when trying to unmarshal an invalid ID.

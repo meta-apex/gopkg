@@ -1,4 +1,4 @@
-package guid
+package metaid
 
 import (
 	"bytes"
@@ -326,7 +326,7 @@ func (id ID) IsZero() bool {
 	return id.IsNil()
 }
 
-// NilID returns a zero value for `guid.ID`.
+// NilID returns a zero value for `metaid.ID`.
 func NilID() ID {
 	return nilID
 }

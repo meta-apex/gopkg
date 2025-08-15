@@ -1,6 +1,6 @@
 //go:build freebsd
 
-package guid
+package metaid
 
 import "syscall"
 

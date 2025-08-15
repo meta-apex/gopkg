@@ -1,6 +1,6 @@
 //go:build linux
 
-package guid
+package metaid
 
 import "os"
 
