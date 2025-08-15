@@ -210,47 +210,41 @@ func setFieldValue(field reflect.Value, value any, fieldPath string) error {
 // convertAndSetValue converts value to field type and sets it
 func convertAndSetValue(field reflect.Value, value any, fieldPath string) error {
 	fieldType := field.Type()
-	valueStr := fmt.Sprintf("%v", value)
 
 	switch fieldType.Kind() {
 	case reflect.String:
-		field.SetString(valueStr)
+		if str, ok := value.(string); ok {
+			field.SetString(str)
+		} else {
+			field.SetString(fmt.Sprintf("%v", value))
+		}
 
 	case reflect.Bool:
-		if boolVal, err := strconv.ParseBool(valueStr); err == nil {
-			field.SetBool(boolVal)
+		if b, ok := value.(bool); ok {
+			field.SetBool(b)
+		} else if str, ok := value.(string); ok {
+			if boolVal, err := strconv.ParseBool(str); err == nil {
+				field.SetBool(boolVal)
+			} else {
+				return fmt.Errorf("field %s cannot convert '%v' to bool", fieldPath, value)
+			}
 		} else {
 			return fmt.Errorf("field %s cannot convert '%v' to bool", fieldPath, value)
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if intVal, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
-			if field.OverflowInt(intVal) {
-				return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, fieldType.Kind())
-			}
-			field.SetInt(intVal)
-		} else {
-			return fmt.Errorf("field %s cannot convert '%v' to %s", fieldPath, value, fieldType.Kind())
+		if err := setIntValue(field, value, fieldPath); err != nil {
+			return err
 		}
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if uintVal, err := strconv.ParseUint(valueStr, 10, 64); err == nil {
-			if field.OverflowUint(uintVal) {
-				return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, fieldType.Kind())
-			}
-			field.SetUint(uintVal)
-		} else {
-			return fmt.Errorf("field %s cannot convert '%v' to %s", fieldPath, value, fieldType.Kind())
+		if err := setUintValue(field, value, fieldPath); err != nil {
+			return err
 		}
 
 	case reflect.Float32, reflect.Float64:
-		if floatVal, err := strconv.ParseFloat(valueStr, 64); err == nil {
-			if field.OverflowFloat(floatVal) {
-				return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, fieldType.Kind())
-			}
-			field.SetFloat(floatVal)
-		} else {
-			return fmt.Errorf("field %s cannot convert '%v' to %s", fieldPath, value, fieldType.Kind())
+		if err := setFloatValue(field, value, fieldPath); err != nil {
+			return err
 		}
 
 	case reflect.Slice:
@@ -266,6 +260,131 @@ func convertAndSetValue(field reflect.Value, value any, fieldPath string) error 
 	return nil
 }
 
+// setIntValue sets integer value
+func setIntValue(field reflect.Value, value any, fieldPath string) error {
+	var intVal int64
+	var err error
+
+	switch v := value.(type) {
+	case int:
+		intVal = int64(v)
+	case int8:
+		intVal = int64(v)
+	case int16:
+		intVal = int64(v)
+	case int32:
+		intVal = int64(v)
+	case int64:
+		intVal = v
+	case uint:
+		intVal = int64(v)
+	case uint8:
+		intVal = int64(v)
+	case uint16:
+		intVal = int64(v)
+	case uint32:
+		intVal = int64(v)
+	case uint64:
+		intVal = int64(v)
+	case float32:
+		intVal = int64(v)
+	case float64:
+		intVal = int64(v)
+	case string:
+		intVal, err = strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return fmt.Errorf("field %s cannot convert '%v' to int", fieldPath, value)
+		}
+	default:
+		return fmt.Errorf("field %s cannot convert '%v' to int", fieldPath, value)
+	}
+
+	if field.OverflowInt(intVal) {
+		return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, field.Type().Kind())
+	}
+	field.SetInt(intVal)
+	return nil
+}
+
+// setUintValue sets unsigned integer value
+func setUintValue(field reflect.Value, value any, fieldPath string) error {
+	var uintVal uint64
+	var err error
+
+	switch v := value.(type) {
+	case uint:
+		uintVal = uint64(v)
+	case uint8:
+		uintVal = uint64(v)
+	case uint16:
+		uintVal = uint64(v)
+	case uint32:
+		uintVal = uint64(v)
+	case uint64:
+		uintVal = v
+	case int:
+		if v < 0 {
+			return fmt.Errorf("field %s cannot convert negative value %v to uint", fieldPath, value)
+		}
+		uintVal = uint64(v)
+	case int8, int16, int32, int64:
+		intVal := reflect.ValueOf(v).Int()
+		if intVal < 0 {
+			return fmt.Errorf("field %s cannot convert negative value %v to uint", fieldPath, value)
+		}
+		uintVal = uint64(intVal)
+	case float32, float64:
+		floatVal := reflect.ValueOf(v).Float()
+		if floatVal < 0 {
+			return fmt.Errorf("field %s cannot convert negative value %v to uint", fieldPath, value)
+		}
+		uintVal = uint64(floatVal)
+	case string:
+		uintVal, err = strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return fmt.Errorf("field %s cannot convert '%v' to uint", fieldPath, value)
+		}
+	default:
+		return fmt.Errorf("field %s cannot convert '%v' to uint", fieldPath, value)
+	}
+
+	if field.OverflowUint(uintVal) {
+		return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, field.Type().Kind())
+	}
+	field.SetUint(uintVal)
+	return nil
+}
+
+// setFloatValue sets floating point value
+func setFloatValue(field reflect.Value, value any, fieldPath string) error {
+	var floatVal float64
+	var err error
+
+	switch v := value.(type) {
+	case float32:
+		floatVal = float64(v)
+	case float64:
+		floatVal = v
+	case int, int8, int16, int32, int64:
+		floatVal = float64(reflect.ValueOf(v).Int())
+	case uint, uint8, uint16, uint32, uint64:
+		floatVal = float64(reflect.ValueOf(v).Uint())
+	case string:
+		floatVal, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return fmt.Errorf("field %s cannot convert '%v' to float", fieldPath, value)
+		}
+	default:
+		return fmt.Errorf("field %s cannot convert '%v' to float", fieldPath, value)
+	}
+
+	if field.OverflowFloat(floatVal) {
+		return fmt.Errorf("field %s value %v overflows %s", fieldPath, value, field.Type().Kind())
+	}
+	field.SetFloat(floatVal)
+	return nil
+}
+
 // setSliceValue sets slice field value
 func setSliceValue(field reflect.Value, value any, fieldPath string) error {
 	valueSlice, ok := value.([]any)
@@ -275,6 +394,7 @@ func setSliceValue(field reflect.Value, value any, fieldPath string) error {
 
 	sliceType := field.Type()
 
+	// Pre-allocate slice capacity
 	newSlice := reflect.MakeSlice(sliceType, len(valueSlice), len(valueSlice))
 
 	for i, item := range valueSlice {
@@ -299,12 +419,13 @@ func setMapValue(field reflect.Value, value any, fieldPath string) error {
 	keyType := mapType.Key()
 	valueType := mapType.Elem()
 
-	// Only support string keys for now
+	// Only string keys are supported
 	if keyType.Kind() != reflect.String {
 		return fmt.Errorf("field %s only string keys are supported for maps", fieldPath)
 	}
 
-	newMap := reflect.MakeMap(mapType)
+	// Pre-allocate map capacity
+	newMap := reflect.MakeMapWithSize(mapType, len(valueMap))
 
 	for k, v := range valueMap {
 		mapValue := reflect.New(valueType).Elem()

@@ -23,18 +23,27 @@ func loadEnvFile() {
 	})
 }
 
+var (
+	envVarRegex = regexp.MustCompile(`\$\{([^}:]+)(?::([^}]*))?\}`)
+)
+
 // processEnvVars processes environment variables in a string value
 func processEnvVars(value string, useEnv bool) (string, error) {
 	if !useEnv {
-		// Check if value contains env var syntax
+		// Fast check for env var syntax
+		if strings.IndexByte(value, '$') == -1 {
+			return value, nil
+		}
 		if strings.Contains(value, "${") {
 			return "", fmt.Errorf("environment variables not enabled but found env var syntax in value: %s", value)
 		}
 		return value, nil
 	}
 
-	// Regex to match ${VAR} and ${VAR:default}
-	envVarRegex := regexp.MustCompile(`\$\{([^}:]+)(?::([^}]*))?\}`)
+	// Fast path: no env vars
+	if strings.IndexByte(value, '$') == -1 {
+		return value, nil
+	}
 
 	// First, check for any environment variables without default values that don't exist
 	matches := envVarRegex.FindAllStringSubmatch(value, -1)
