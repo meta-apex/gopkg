@@ -2,7 +2,7 @@ package guid
 
 const (
 	// ErrInvalidID is returned when trying to unmarshal an invalid ID.
-	ErrInvalidID strErr = "xid: invalid ID"
+	ErrInvalidID strErr = "invalid ID"
 )
 
 // strErr allows declaring errors as constants.

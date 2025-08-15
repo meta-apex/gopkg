@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/meta-apex/gopkg/proc"
 )
 
 type ID [rawLen]byte
@@ -80,25 +82,25 @@ func readMachineID() []byte {
 	} else {
 		// Fallback to rand number if machine id can't be gathered
 		if _, randErr := rand.Reader.Read(id); randErr != nil {
-			panic(fmt.Errorf("xid: cannot get hostname nor generate a random number: %v; %v", err, randErr))
+			panic(fmt.Errorf("cannot get hostname nor generate a random number: %v; %v", err, randErr))
 		}
 	}
 	return id
 }
 
 func readMachineIDFromEnv() []byte {
-	envMachineID := os.Getenv("GUID_MACHINE_ID")
+	envMachineID := proc.Env("META_MACHINE_ID")
 	if envMachineID == "" {
 		return nil
 	}
 
 	num, err := strconv.Atoi(envMachineID)
 	if err != nil {
-		panic("GUID_MACHINE_ID value is set to not a number")
+		panic("META_MACHINE_ID value is set to not a number")
 	}
 
 	if num < 0 || num > 0xFFFFFF {
-		panic("GUID_MACHINE_ID out of range for 3 bytes")
+		panic("META_MACHINE_ID out of range for 3 bytes")
 	}
 
 	// Encode the number into big endian.
@@ -109,7 +111,7 @@ func readMachineIDFromEnv() []byte {
 func randInt() uint32 {
 	b := make([]byte, 3)
 	if _, err := rand.Reader.Read(b); err != nil {
-		panic(fmt.Errorf("xid: cannot generate random number: %v;", err))
+		panic(fmt.Errorf("cannot generate random number: %v", err))
 	}
 	return uint32(b[0])<<16 | uint32(b[1])<<8 | uint32(b[2])
 }
@@ -124,19 +126,23 @@ func NewWithTime(t time.Time) ID {
 	var id ID
 	// Timestamp, 4 bytes, big endian
 	binary.BigEndian.PutUint32(id[:], uint32(t.Unix()))
-	// Machine ID, 3 bytes
+	// Machine ID, 2 bytes
 	id[4] = machineID[0]
 	id[5] = machineID[1]
-	id[6] = machineID[2]
 	// Pid, 2 bytes, specs don't specify endianness, but we use big endian.
-	id[7] = byte(pid >> 8)
-	id[8] = byte(pid)
-	// Increment, 3 bytes, big endian
+	id[6] = byte(pid >> 8)
+	id[7] = byte(pid)
+	// Increment, 4 bytes, big endian
 	i := atomic.AddUint32(&objectIDCounter, 1)
+	id[8] = byte(i >> 24)
 	id[9] = byte(i >> 16)
 	id[10] = byte(i >> 8)
 	id[11] = byte(i)
 	return id
+}
+
+func SetCounter(counter uint32) {
+	objectIDCounter = counter
 }
 
 // FromString reads an ID from its string representation
@@ -270,21 +276,21 @@ func (id ID) Time() time.Time {
 // Machine returns the 3-byte machine id part of the id.
 // It's a runtime error to call this method with an invalid id.
 func (id ID) Machine() []byte {
-	return id[4:7]
+	return id[4:6]
 }
 
 // Pid returns the process id part of the id.
 // It's a runtime error to call this method with an invalid id.
 func (id ID) Pid() uint16 {
-	return binary.BigEndian.Uint16(id[7:9])
+	return binary.BigEndian.Uint16(id[6:8])
 }
 
 // Counter returns the incrementing value part of the id.
 // It's a runtime error to call this method with an invalid id.
-func (id ID) Counter() int32 {
-	b := id[9:12]
+func (id ID) Counter() uint32 {
+	b := id[8:12]
 	// Counter is stored as big-endian 3-byte value
-	return int32(uint32(b[0])<<16 | uint32(b[1])<<8 | uint32(b[2]))
+	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
 }
 
 // Value implements the driver.Valuer interface.
@@ -307,7 +313,7 @@ func (id *ID) Scan(value interface{}) (err error) {
 		*id = nilID
 		return nil
 	default:
-		return fmt.Errorf("xid: scanning unsupported type: %T", value)
+		return fmt.Errorf("scanning unsupported type: %T", value)
 	}
 }
 
@@ -316,7 +322,6 @@ func (id ID) IsNil() bool {
 	return id == nilID
 }
 
-// Alias of IsNil
 func (id ID) IsZero() bool {
 	return id.IsNil()
 }
